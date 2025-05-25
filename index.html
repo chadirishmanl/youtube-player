@@ -253,7 +253,7 @@
       loadVideo(currentVideoIndex);
     }
 
-    // --- Load channel videos from RSS feed using corsproxy.io ---
+    // --- NEW: Load channel videos from RSS feed ---
 
     document.getElementById('loadChannelBtn').addEventListener('click', () => {
       const channelId = document.getElementById('channelIdInput').value.trim();
@@ -271,13 +271,14 @@
       const rssUrl = `https://www.youtube.com/feeds/videos.xml?channel_id=${channelId}`;
 
       try {
-        const proxyUrl = 'https://corsproxy.io/?' + encodeURIComponent(rssUrl);
+        // Use cors-anywhere proxy (must enable access first)
+        const proxyUrl = 'https://cors-anywhere.herokuapp.com/' + rssUrl;
         const response = await fetch(proxyUrl);
         if (!response.ok) throw new Error('Failed to fetch RSS feed.');
 
-        const text = await response.text();
+        const textData = await response.text();
         const parser = new DOMParser();
-        const xmlDoc = parser.parseFromString(text, "application/xml");
+        const xmlDoc = parser.parseFromString(textData, "application/xml");
 
         const entries = xmlDoc.querySelectorAll('entry');
         if (!entries.length) {
