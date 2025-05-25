@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Enhanced YouTube Playlist Player with Channel RSS Loader</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      max-width: 900px;
+      margin: 20px auto;
+      padding: 0 10px;
+      text-align: center;
+    }
+    #current-title {
+      font-weight: bold;
+      font-size: 20px;
+      margin-bottom: 10px;
+      min-height: 28px;
+    }
+    #player-container {
+      position: relative;
+      padding-bottom: 56.25%; /* 16:9 ratio */
+      height: 0;
+      overflow: hidden;
+      max-width: 100%;
+      margin: 0 auto 20px;
+    }
+    #player {
+      position: absolute;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+    }
+    #controls {
+      margin-bottom: 20px;
+    }
+    button {
+      background-color: #ff0000;
+      border: none;
+      color: white;
+      padding: 10px 16px;
+      font-size: 16px;
+      margin: 0 6px;
+      cursor: pointer;
+      border-radius: 4px;
+      user-select: none;
+      transition: background-color 0.3s;
+    }
+    button:hover {
+      background-color: #cc0000;
+    }
+    label {
+      font-size: 16px;
+      margin-left: 10px;
+      user-select: none;
+    }
+    #playlist {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 15px;
+      justify-content: center;
+    }
+    .video-item {
+      cursor: pointer;
+      width: 150px;
+      text-align: center;
+      border: 2px solid transparent;
+      border-radius: 8px;
+      transition: border-color 0.3s;
+      user-select: none;
+    }
+    .video-item:hover {
+      border-color: #ff0000;
+    }
+    .video-item img {
+      width: 100%;
+      border-radius: 8px;
+    }
+    .video-title {
+      font-size: 14px;
+      margin-top: 5px;
+    }
+    .active {
+      border-color: #ff0000;
+    }
+    #channel-input-container {
+      margin-bottom: 15px;
+    }
+    #error-message {
+      color: red;
+      margin-top: 8px;
+      min-height: 18px;
+    }
+  </style>
+</head>
+<body>
+
+  <h1>Enhanced YouTube Playlist Player</h1>
+
+  <div id="channel-input-container">
+    <input type="text" id="channelIdInput" placeholder="Enter YouTube Channel ID" size="40" />
+    <button id="loadChannelBtn">Load Channel Videos</button>
+  </div>
+  <div id="error-message"></div>
+
+  <div id="current-title"></div>
+
+  <div id="player-container">
+    <div id="player"></div>
+  </div>
+
+  <div id="controls">
+    <button id="prevBtn" title="Previous Video">⏮ Prev</button>
+    <button id="playPauseBtn" title="Play/Pause">▶️ Play</button>
+    <button id="nextBtn" title="Next Video">⏭ Next</button>
+    <label>
+      <input type="checkbox" id="autoplayToggle" checked />
+      Autoplay Next
+    </label>
+  </div>
+
+  <div id="playlist"></div>
+
+  <script src="https://www.youtube.com/iframe_api"></script>
+
+  <script>
+    let videos = [
+      {
+        videoId: 'dQw4w9WgXcQ',
+        title: 'Rick Astley - Never Gonna Give You Up',
+        thumbnail: 'https://img.youtube.com/vi/dQw4w9WgXcQ/mqdefault.jpg',
+      }
+    ];
+
+    let player;
+    let currentVideoIndex = 0;
+    let isPlaying = false;
+
+    function onYouTubeIframeAPIReady() {
+      player = new YT.Player('player', {
+        videoId: videos[0].videoId,
+        playerVars: {
+          autoplay: 0,
+          controls: 1,
+          modestbranding: 1,
+          rel: 0
+        },
+        events: {
+          onReady: onPlayerReady,
+          onStateChange: onPlayerStateChange
+        }
+      });
+      buildPlaylistUI();
+      updateTitle();
+    }
+
+    function buildPlaylistUI() {
+      const playlistDiv = document.getElementById('playlist');
+      playlistDiv.innerHTML = '';
+      videos.forEach((video, index) => {
+        const div = document.createElement('div');
+        div.className = 'video-item';
+        div.innerHTML = `
+          <img src="${video.thumbnail}" alt="${video.title}" />
+          <div class="video-title">${video.title}</div>
+        `;
+        div.addEventListener('click', () => {
+          if (index !== currentVideoIndex) {
+            currentVideoIndex = index;
+            loadVideo(currentVideoIndex);
+          }
+        });
+        playlistDiv.appendChild(div);
+      });
+      highlightActive(currentVideoIndex);
+    }
+
+    function highlightActive(index) {
+      const items = document.querySelectorAll('.video-item');
+      items.forEach((item, i) => {
+        item.classList.toggle('active', i === index);
+      });
+    }
+
+    function loadVideo(index) {
+      currentVideoIndex = index;
+      player.loadVideoById(videos[index].videoId);
+      updateTitle();
+      highlightActive(index);
+      updatePlayPauseButton(true);
+    }
+
+    function updateTitle() {
+      const titleDiv = document.getElementById('current-title');
+      titleDiv.textContent = videos[currentVideoIndex].title || '';
+    }
+
+    function onPlayerReady() {
+      document.getElementById('playPauseBtn').addEventListener('click', () => {
+        if (isPlaying) {
+          player.pauseVideo();
+        } else {
+          player.playVideo();
+        }
+      });
+      document.getElementById('nextBtn').addEventListener('click', playNextVideo);
+      document.getElementById('prevBtn').addEventListener('click', playPrevVideo);
+
+      window.addEventListener('keydown', e => {
+        if (e.target.tagName === 'INPUT') return; // ignore input fields
+        if (e.code === 'Space') {
+          e.preventDefault();
+          if (isPlaying) player.pauseVideo();
+          else player.playVideo();
+        } else if (e.code === 'ArrowRight') {
+          e.preventDefault();
+          playNextVideo();
+        } else if (e.code === 'ArrowLeft') {
+          e.preventDefault();
+          playPrevVideo();
+        }
+      });
+    }
+
+    function onPlayerStateChange(event) {
+      if (event.data === YT.PlayerState.PLAYING) {
+        isPlaying = true;
+        updatePlayPauseButton(true);
+      } else if (event.data === YT.PlayerState.PAUSED || event.data === YT.PlayerState.ENDED) {
+        isPlaying = false;
+        updatePlayPauseButton(false);
+      }
+      if (event.data === YT.PlayerState.ENDED) {
+        if (document.getElementById('autoplayToggle').checked) {
+          playNextVideo();
+        }
+      }
+    }
+
+    function updatePlayPauseButton(playing) {
+      const btn = document.getElementById('playPauseBtn');
+      btn.textContent = playing ? '⏸ Pause' : '▶️ Play';
+    }
+
+    function playNextVideo() {
+      currentVideoIndex++;
+      if (currentVideoIndex >= videos.length) currentVideoIndex = 0;
+      loadVideo(currentVideoIndex);
+    }
+
+    function playPrevVideo() {
+      currentVideoIndex--;
+      if (currentVideoIndex < 0) currentVideoIndex = videos.length - 1;
+      loadVideo(currentVideoIndex);
+    }
+
+    // --- Load channel videos from RSS feed using corsproxy.io ---
+
+    document.getElementById('loadChannelBtn').addEventListener('click', () => {
+      const channelId = document.getElementById('channelIdInput').value.trim();
+      const errorDiv = document.getElementById('error-message');
+      errorDiv.textContent = '';
+      if (!channelId) {
+        errorDiv.textContent = 'Please enter a YouTube Channel ID.';
+        return;
+      }
+      fetchChannelVideos(channelId);
+    });
+
+    async function fetchChannelVideos(channelId) {
+      const errorDiv = document.getElementById('error-message');
+      const rssUrl = `https://www.youtube.com/feeds/videos.xml?channel_id=${channelId}`;
+
+      try {
+        const proxyUrl = 'https://corsproxy.io/?' + encodeURIComponent(rssUrl);
+        const response = await fetch(proxyUrl);
+        if (!response.ok) throw new Error('Failed to fetch RSS feed.');
+
+        const text = await response.text();
+        const parser = new DOMParser();
+        const xmlDoc = parser.parseFromString(text, "application/xml");
+
+        const entries = xmlDoc.querySelectorAll('entry');
+        if (!entries.length) {
+          errorDiv.textContent = 'No videos found or invalid channel ID.';
+          return;
+        }
+
+        videos = [];
+        entries.forEach(entry => {
+          const videoId = entry.querySelector('yt\\:videoId')?.textContent;
+          const title = entry.querySelector('title')?.textContent;
+          const thumbnail = `https://img.youtube.com/vi/${videoId}/mqdefault.jpg`;
+          if (videoId && title) {
+            videos.push({ videoId, title, thumbnail });
+          }
+        });
+
+        if (videos.length === 0) {
+          errorDiv.textContent = 'No videos found in this channel.';
+          return;
+        }
+
+        currentVideoIndex = 0;
+        buildPlaylistUI();
+        loadVideo(0);
+        errorDiv.textContent = '';
+      } catch (err) {
+        errorDiv.textContent = 'Error loading channel videos: ' + err.message;
+      }
+    }
+  </script>
+
+</body>
+</html>
